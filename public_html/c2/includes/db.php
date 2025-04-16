@@ -59,7 +59,22 @@ class Database {
                 $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             } else if ($dbType === 'sqlite') {
                 // Create SQLite connection
-                $dbPath = getenv('DB_PATH') ?: __DIR__ . '/../../database/astra_c2.db';
+                $dbPath = getenv('DB_PATH') ?: __DIR__ . '/../../../database/astra_c2.db';
+                
+                // Debug info
+                error_log("SQLite DB Path: " . $dbPath);
+                
+                // Check if file exists
+                if (!file_exists($dbPath)) {
+                    error_log("SQLite database file does not exist at: " . $dbPath);
+                    // Try to create the directory if it doesn't exist
+                    $dir = dirname($dbPath);
+                    if (!is_dir($dir)) {
+                        mkdir($dir, 0755, true);
+                        error_log("Created directory: " . $dir);
+                    }
+                }
+                
                 $this->conn = new PDO('sqlite:' . $dbPath);
                 
                 // Enable exceptions

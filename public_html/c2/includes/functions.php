@@ -101,6 +101,206 @@ function sendJsonResponse($data, $status = 200) {
 }
 
 /**
+ * Get database-agnostic date function
+ * Returns the appropriate SQL function for the current database type to get current date/time
+ * 
+ * @param Database $db Database instance
+ * @return string SQL function for current date/time
+ */
+function getDbDateFunction($db = null) {
+    if ($db === null) {
+        $db = Database::getInstance();
+    }
+    
+    $dbType = $db->getDbType();
+    
+    if ($dbType === 'mysql') {
+        return 'NOW()';
+    } else if ($dbType === 'postgres') {
+        return 'CURRENT_TIMESTAMP';
+    } else if ($dbType === 'sqlite') {
+        return "datetime('now')";
+    }
+    
+    // Default fallback
+    return 'CURRENT_TIMESTAMP';
+}
+
+/**
+ * Get database-agnostic interval subtraction function
+ * Returns SQL to subtract interval from a date for the current database type
+ * 
+ * @param string $field Field name
+ * @param int $value Interval value
+ * @param string $unit Interval unit (MINUTE, HOUR, DAY)
+ * @param Database $db Database instance
+ * @return string SQL for interval subtraction
+ */
+function getDbIntervalSubtract($field, $value, $unit, $db = null) {
+    if ($db === null) {
+        $db = Database::getInstance();
+    }
+    
+    $dbType = $db->getDbType();
+    
+    if ($dbType === 'mysql') {
+        return "DATE_SUB($field, INTERVAL $value $unit)";
+    } else if ($dbType === 'postgres') {
+        $unit = strtolower($unit);
+        return "($field - INTERVAL '$value $unit')";
+    } else if ($dbType === 'sqlite') {
+        $seconds = 0;
+        if ($unit === 'MINUTE') {
+            $seconds = $value * 60;
+        } else if ($unit === 'HOUR') {
+            $seconds = $value * 3600;
+        } else if ($unit === 'DAY') {
+            $seconds = $value * 86400;
+        }
+        return "datetime($field, '-$seconds seconds')";
+    }
+    
+    // Default fallback to MySQL syntax
+    return "DATE_SUB($field, INTERVAL $value $unit)";
+}
+
+/**
+ * Get fetch function appropriate for the database type and statement
+ * Returns an associative array of data from the result
+ * 
+ * @param mixed $stmt Statement from executeQuery
+ * @param Database $db Database instance
+ * @return array|null Associative array of data or null on error/empty result
+ */
+function dbFetchAssoc($stmt, $db = null) {
+    if ($stmt === false) {
+        return null;
+    }
+    
+    if ($db === null) {
+        $db = Database::getInstance();
+    }
+    
+    $dbType = $db->getDbType();
+    
+    if ($dbType === 'mysql') {
+        $result = $stmt->get_result();
+        if ($result) {
+            $row = $result->fetch_assoc();
+            $stmt->close();
+            return $row;
+        }
+        $stmt->close();
+        return null;
+    } else if ($dbType === 'postgres' || $dbType === 'sqlite') {
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+    
+    return null;
+}
+
+/**
+ * Get all rows from a statement
+ * Returns an array of associative arrays
+ * 
+ * @param mixed $stmt Statement from executeQuery
+ * @param Database $db Database instance
+ * @return array Array of associative arrays or empty array on error/empty result
+ */
+function dbFetchAll($stmt, $db = null) {
+    if ($stmt === false) {
+        return [];
+    }
+    
+    if ($db === null) {
+        $db = Database::getInstance();
+    }
+    
+    $dbType = $db->getDbType();
+    
+    if ($dbType === 'mysql') {
+        $result = $stmt->get_result();
+        if ($result) {
+            $rows = $result->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+            return $rows;
+        }
+        $stmt->close();
+        return [];
+    } else if ($dbType === 'postgres' || $dbType === 'sqlite') {
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $rows ?: [];
+    }
+    
+    return [];
+}
+
+/**
+ * Get the number of affected rows from a statement
+ * 
+ * @param mixed $stmt Statement from executeQuery
+ * @param Database $db Database instance
+ * @return int Number of affected rows or 0 on error
+ */
+function dbAffectedRows($stmt, $db = null) {
+    if ($stmt === false) {
+        return 0;
+    }
+    
+    if ($db === null) {
+        $db = Database::getInstance();
+    }
+    
+    $dbType = $db->getDbType();
+    
+    if ($dbType === 'mysql') {
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+        return $affected;
+    } else if ($dbType === 'postgres' || $dbType === 'sqlite') {
+        return $stmt->rowCount();
+    }
+    
+    return 0;
+}
+
+/**
+ * Get a single value from the first column of the first row
+ * 
+ * @param mixed $stmt Statement from executeQuery
+ * @param Database $db Database instance
+ * @return mixed Value or null on error/empty result
+ */
+function dbFetchValue($stmt, $db = null) {
+    if ($stmt === false) {
+        return null;
+    }
+    
+    if ($db === null) {
+        $db = Database::getInstance();
+    }
+    
+    $dbType = $db->getDbType();
+    
+    if ($dbType === 'mysql') {
+        $result = $stmt->get_result();
+        if ($result) {
+            $row = $result->fetch_row();
+            $stmt->close();
+            return $row ? $row[0] : null;
+        }
+        $stmt->close();
+        return null;
+    } else if ($dbType === 'postgres' || $dbType === 'sqlite') {
+        $value = $stmt->fetchColumn();
+        return $value !== false ? $value : null;
+    }
+    
+    return null;
+}
+
+/**
  * Verify device authentication
  * 
  * @param string $deviceId Device ID
@@ -117,14 +317,7 @@ function verifyDeviceAuth($deviceId, $authToken) {
         [$deviceId, $authToken]
     );
     
-    if ($stmt === false) {
-        return false;
-    }
-    
-    $result = $stmt->get_result();
-    $count = $result->fetch_row()[0];
-    $stmt->close();
-    
+    $count = dbFetchValue($stmt, $db);
     return $count > 0;
 }
 
@@ -138,19 +331,14 @@ function updateDeviceLastSeen($deviceId) {
     require_once __DIR__ . '/db.php';
     
     $db = Database::getInstance();
+    $now = getDbDateFunction($db);
     $stmt = $db->executeQuery(
-        "UPDATE devices SET last_seen = NOW() WHERE device_id = ?",
+        "UPDATE devices SET last_seen = $now WHERE device_id = ?",
         "s",
         [$deviceId]
     );
     
-    if ($stmt === false) {
-        return false;
-    }
-    
-    $affected = $stmt->affected_rows;
-    $stmt->close();
-    
+    $affected = dbAffectedRows($stmt, $db);
     return $affected > 0;
 }
 

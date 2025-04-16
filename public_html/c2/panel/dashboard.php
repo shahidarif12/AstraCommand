@@ -24,10 +24,12 @@ if (!isset($_SESSION['admin_authenticated']) || $_SESSION['admin_authenticated']
 $db = Database::getInstance();
 
 // Get device statistics
+$tenMinAgo = getDbIntervalSubtract(getDbDateFunction(), 10, 'MINUTE', $db);
+
 $deviceStatsStmt = $db->executeQuery("
     SELECT 
         COUNT(*) as total_devices,
-        SUM(CASE WHEN last_seen >= DATE_SUB(NOW(), INTERVAL 10 MINUTE) THEN 1 ELSE 0 END) as online_devices,
+        SUM(CASE WHEN last_seen >= $tenMinAgo THEN 1 ELSE 0 END) as online_devices,
         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_devices
     FROM devices
 ");
@@ -39,8 +41,14 @@ if ($deviceStatsStmt === false) {
         'active_devices' => 0
     ];
 } else {
-    $deviceStats = $deviceStatsStmt->get_result()->fetch_assoc();
-    $deviceStatsStmt->close();
+    $deviceStats = dbFetchAssoc($deviceStatsStmt, $db);
+    if (!$deviceStats) {
+        $deviceStats = [
+            'total_devices' => 0,
+            'online_devices' => 0,
+            'active_devices' => 0
+        ];
+    }
 }
 
 // Get command statistics
@@ -59,8 +67,14 @@ if ($commandStatsStmt === false) {
         'completed_commands' => 0
     ];
 } else {
-    $commandStats = $commandStatsStmt->get_result()->fetch_assoc();
-    $commandStatsStmt->close();
+    $commandStats = dbFetchAssoc($commandStatsStmt, $db);
+    if (!$commandStats) {
+        $commandStats = [
+            'total_commands' => 0,
+            'pending_commands' => 0,
+            'completed_commands' => 0
+        ];
+    }
 }
 
 // Get log statistics
@@ -81,8 +95,15 @@ if ($logStatsStmt === false) {
         'notification_logs' => 0
     ];
 } else {
-    $logStats = $logStatsStmt->get_result()->fetch_assoc();
-    $logStatsStmt->close();
+    $logStats = dbFetchAssoc($logStatsStmt, $db);
+    if (!$logStats) {
+        $logStats = [
+            'total_logs' => 0,
+            'gps_logs' => 0,
+            'sms_logs' => 0,
+            'notification_logs' => 0
+        ];
+    }
 }
 
 // Get recent devices
@@ -96,12 +117,7 @@ $recentDevicesStmt = $db->executeQuery("
 if ($recentDevicesStmt === false) {
     $recentDevices = [];
 } else {
-    $result = $recentDevicesStmt->get_result();
-    $recentDevices = [];
-    while ($row = $result->fetch_assoc()) {
-        $recentDevices[] = $row;
-    }
-    $recentDevicesStmt->close();
+    $recentDevices = dbFetchAll($recentDevicesStmt, $db);
 }
 
 // Get recent commands
@@ -116,17 +132,23 @@ $recentCommandsStmt = $db->executeQuery("
 if ($recentCommandsStmt === false) {
     $recentCommands = [];
 } else {
-    $result = $recentCommandsStmt->get_result();
-    $recentCommands = [];
-    while ($row = $result->fetch_assoc()) {
-        $recentCommands[] = $row;
-    }
-    $recentCommandsStmt->close();
+    $recentCommands = dbFetchAll($recentCommandsStmt, $db);
 }
 
 // Get recent logs
+// Adjust SQL based on database type for substring function
+$dbType = $db->getDbType();
+$contentPreviewSql = "";
+if ($dbType === 'mysql') {
+    $contentPreviewSql = "LEFT(l.content, 100) as content_preview";
+} else if ($dbType === 'postgres') {
+    $contentPreviewSql = "SUBSTRING(l.content FROM 1 FOR 100) as content_preview";
+} else if ($dbType === 'sqlite') {
+    $contentPreviewSql = "SUBSTR(l.content, 1, 100) as content_preview";
+}
+
 $recentLogsStmt = $db->executeQuery("
-    SELECT l.id, l.device_id, d.name as device_name, l.type, LEFT(l.content, 100) as content_preview, l.timestamp
+    SELECT l.id, l.device_id, d.name as device_name, l.type, $contentPreviewSql, l.timestamp
     FROM logs l
     JOIN devices d ON l.device_id = d.device_id
     ORDER BY l.timestamp DESC
@@ -136,12 +158,7 @@ $recentLogsStmt = $db->executeQuery("
 if ($recentLogsStmt === false) {
     $recentLogs = [];
 } else {
-    $result = $recentLogsStmt->get_result();
-    $recentLogs = [];
-    while ($row = $result->fetch_assoc()) {
-        $recentLogs[] = $row;
-    }
-    $recentLogsStmt->close();
+    $recentLogs = dbFetchAll($recentLogsStmt, $db);
 }
 ?>
 
