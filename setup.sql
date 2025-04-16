@@ -1,51 +1,51 @@
--- Astra C2 Database Setup for MySQL
+-- Astra C2 Database Setup for SQLite
 
 -- Create tables if they don't exist
 CREATE TABLE IF NOT EXISTS devices (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    device_id VARCHAR(64) NOT NULL UNIQUE,
-    name VARCHAR(128) NOT NULL,
-    os VARCHAR(64) NOT NULL,
-    ip_address VARCHAR(45) NOT NULL,
-    auth_token VARCHAR(64) NOT NULL,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    os TEXT NOT NULL,
+    ip_address TEXT NOT NULL,
+    auth_token TEXT NOT NULL,
     last_seen DATETIME NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'active'
+    status TEXT NOT NULL DEFAULT 'active'
 );
 
 CREATE TABLE IF NOT EXISTS commands (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    device_id VARCHAR(64) NOT NULL,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT NOT NULL,
     command TEXT NOT NULL,
     issued_at DATETIME NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    status TEXT NOT NULL DEFAULT 'pending',
     output TEXT,
     FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS logs (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    device_id VARCHAR(64) NOT NULL,
-    type VARCHAR(20) NOT NULL,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id TEXT NOT NULL,
+    type TEXT NOT NULL,
     content TEXT NOT NULL,
     timestamp DATETIME NOT NULL,
     FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS admins (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(64) NOT NULL UNIQUE,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_devices_last_seen ON devices(last_seen);
-CREATE INDEX idx_devices_status ON devices(status);
-CREATE INDEX idx_commands_device_id ON commands(device_id);
-CREATE INDEX idx_commands_status ON commands(status);
-CREATE INDEX idx_logs_device_id ON logs(device_id);
-CREATE INDEX idx_logs_type ON logs(type);
-CREATE INDEX idx_logs_timestamp ON logs(timestamp);
+CREATE INDEX IF NOT EXISTS idx_devices_last_seen ON devices(last_seen);
+CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status);
+CREATE INDEX IF NOT EXISTS idx_commands_device_id ON commands(device_id);
+CREATE INDEX IF NOT EXISTS idx_commands_status ON commands(status);
+CREATE INDEX IF NOT EXISTS idx_logs_device_id ON logs(device_id);
+CREATE INDEX IF NOT EXISTS idx_logs_type ON logs(type);
+CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 
 -- Insert default admin if the table is empty
 INSERT INTO admins (username, password_hash, created_at)

@@ -21,7 +21,7 @@ class Database {
         
         try {
             // Check which database system to use
-            $dbType = getenv('DB_TYPE') ?: 'mysql';
+            $dbType = getenv('DB_TYPE') ?: 'sqlite';
             $this->dbType = $dbType;
             
             if ($dbType === 'mysql') {
@@ -57,6 +57,16 @@ class Database {
                 
                 // Set error mode
                 $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            } else if ($dbType === 'sqlite') {
+                // Create SQLite connection
+                $dbPath = getenv('DB_PATH') ?: __DIR__ . '/../../database/astra_c2.db';
+                $this->conn = new PDO('sqlite:' . $dbPath);
+                
+                // Enable exceptions
+                $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                
+                // Enable foreign keys
+                $this->conn->exec('PRAGMA foreign_keys = ON;');
             } else {
                 throw new Exception("Unsupported database type: $dbType");
             }
@@ -119,8 +129,8 @@ class Database {
             }
             
             return $stmt;
-        } else if ($this->dbType === 'postgres') {
-            // PostgreSQL execution via PDO
+        } else if ($this->dbType === 'postgres' || $this->dbType === 'sqlite') {
+            // PDO execution for PostgreSQL or SQLite
             try {
                 $stmt = $this->conn->prepare($sql);
                 
@@ -204,7 +214,7 @@ class Database {
             if ($this->conn) {
                 $this->conn->close();
             }
-        } else if ($this->dbType === 'postgres') {
+        } else if ($this->dbType === 'postgres' || $this->dbType === 'sqlite') {
             // PDO connections are automatically closed when the object is destroyed
             $this->conn = null;
         }
