@@ -1,0 +1,47 @@
+# Astra C2 - Security Configuration
+
+# Disable directory listing
+Options -Indexes
+
+# Protect sensitive files
+<FilesMatch "^\.env|\.sql|\.htaccess">
+  Order allow,deny
+  Deny from all
+</FilesMatch>
+
+# Protect config directory
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^config/.* - [F,L]
+</IfModule>
+
+# Disable access to specific directories
+RedirectMatch 403 ^/includes/.*$
+
+# Set security headers
+<IfModule mod_headers.c>
+  # Prevent clickjacking
+  Header set X-Frame-Options "SAMEORIGIN"
+  # Prevent MIME-type sniffing
+  Header set X-Content-Type-Options "nosniff"
+  # Enable XSS protection
+  Header set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# PHP settings
+<IfModule mod_php7.c>
+  # Disable display of errors in production
+  php_flag display_errors off
+  # Disable PHP information exposure
+  php_flag expose_php off
+  # Set maximum file upload size
+  php_value upload_max_filesize 10M
+  php_value post_max_size 10M
+  # Set session security
+  php_flag session.cookie_httponly on
+</IfModule>
+
+# Custom error pages
+ErrorDocument 403 /c2/panel/index.php
+ErrorDocument 404 /c2/panel/index.php
+ErrorDocument 500 /c2/panel/index.php
