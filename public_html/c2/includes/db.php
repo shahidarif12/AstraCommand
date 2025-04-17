@@ -59,10 +59,32 @@ class Database {
                 $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             } else if ($dbType === 'sqlite') {
                 // Create SQLite connection
-                $dbPath = getenv('DB_PATH') ?: __DIR__ . '/../../../database/astra_c2.db';
-                
-                // Debug info
-                error_log("SQLite DB Path: " . $dbPath);
+                // Try different paths to find the database file
+                $dbPath = getenv('DB_PATH');
+                if (!$dbPath || !file_exists($dbPath)) {
+                    $possiblePaths = [
+                        __DIR__ . '/../../../database/astra_c2.db',  // Three levels up
+                        __DIR__ . '/../../database/astra_c2.db',     // Two levels up
+                        __DIR__ . '/../database/astra_c2.db',        // One level up
+                        dirname(dirname(dirname(__DIR__))) . '/database/astra_c2.db', // Root
+                        getcwd() . '/database/astra_c2.db'           // Current working directory
+                    ];
+                    
+                    foreach ($possiblePaths as $path) {
+                        error_log("Checking SQLite db path: " . $path);
+                        if (file_exists($path)) {
+                            $dbPath = $path;
+                            error_log("Found SQLite database at: " . $dbPath);
+                            break;
+                        }
+                    }
+                    
+                    if (!$dbPath || !file_exists($dbPath)) {
+                        // Default to root level database path
+                        $dbPath = getcwd() . '/database/astra_c2.db';
+                        error_log("Using default SQLite DB Path: " . $dbPath);
+                    }
+                }
                 
                 // Check if file exists
                 if (!file_exists($dbPath)) {
