@@ -43,9 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_command'])) {
             $message = "Failed to verify device";
             $messageType = "danger";
         } else {
-            $result = $checkStmt->get_result();
-            $deviceExists = $result->fetch_row()[0] > 0;
-            $checkStmt->close();
+            // For PDO
+            $deviceExists = $checkStmt->fetchColumn() > 0;
             
             if (!$deviceExists) {
                 $message = "Device not found";
@@ -53,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_command'])) {
             } else {
                 // Insert command
                 $stmt = $db->executeQuery(
-                    "INSERT INTO commands (device_id, command, issued_at, status, output) VALUES (?, ?, NOW(), 'pending', '')",
+                    "INSERT INTO commands (device_id, command, issued_at, status, output) VALUES (?, ?, datetime('now'), 'pending', '')",
                     "ss",
                     [$deviceId, $command]
                 );
@@ -62,8 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_command'])) {
                     $message = "Failed to send command";
                     $messageType = "danger";
                 } else {
-                    $commandId = $stmt->insert_id;
-                    $stmt->close();
+                    // Get the last insert ID for PDO
+                    $commandId = $db->getConnection()->lastInsertId();
                     
                     $message = "Command sent successfully";
                     $messageType = "success";
@@ -84,13 +83,12 @@ $devicesStmt = $db->executeQuery("SELECT device_id, name, last_seen FROM devices
 if ($devicesStmt === false) {
     $devices = [];
 } else {
-    $devicesResult = $devicesStmt->get_result();
     $devices = [];
-    while ($row = $devicesResult->fetch_assoc()) {
+    // For PDO, fetch directly from statement
+    while ($row = $devicesStmt->fetch(PDO::FETCH_ASSOC)) {
         $row['is_online'] = strtotime($row['last_seen']) >= strtotime('-10 minutes');
         $devices[] = $row;
     }
-    $devicesStmt->close();
 }
 
 // Get command history with pagination
@@ -130,8 +128,8 @@ $countStmt = $db->executeQuery($countQuery, !empty($selectedDeviceId) ? "s" : ""
 if ($countStmt === false) {
     $totalCommands = 0;
 } else {
-    $totalCommands = $countStmt->get_result()->fetch_row()[0];
-    $countStmt->close();
+    // For PDO, fetchColumn gets the first column of the first row
+    $totalCommands = $countStmt->fetchColumn();
 }
 
 $totalPages = ceil($totalCommands / $perPage);
@@ -141,12 +139,11 @@ $historyStmt = $db->executeQuery($historyQuery, $types, $historyParams);
 if ($historyStmt === false) {
     $commandHistory = [];
 } else {
-    $historyResult = $historyStmt->get_result();
     $commandHistory = [];
-    while ($row = $historyResult->fetch_assoc()) {
+    // For PDO, fetch directly from statement
+    while ($row = $historyStmt->fetch(PDO::FETCH_ASSOC)) {
         $commandHistory[] = $row;
     }
-    $historyStmt->close();
 }
 
 // Define common command templates
