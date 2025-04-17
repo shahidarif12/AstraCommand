@@ -1,43 +1,41 @@
-name: Build & Release APK
+name: Build and Release APK
 
 on:
   push:
-    branches: 
-      - main   # This means the action will run whenever you push to the 'main' branch
-    # Or, you could use tags like 'v1.0.0' if you prefer versioned releases:
-    # tags:
-    #   - 'v*.*.*'
+    branches:
+      - main
 
 jobs:
   build:
-    name: Build and Release
-    runs-on: ubuntu-latest   # The GitHub runner runs on a fresh Linux machine (Ubuntu)
+    name: Build Android APK
+    runs-on: ubuntu-latest
 
     steps:
-    # 1. Checkout the code
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-    # 2. Set up Java (for building Android APK)
-    - name: Set up JDK
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'   # Set Java version for building the APK (your project might need a different version)
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-    # 3. Grant permission to execute Gradle wrapper script
-    - name: Grant permission to execute Gradle
-      run: chmod +x ./gradlew
+      - name: Set up Gradle
+        uses: gradle/gradle-build-action@v2
 
-    # 4. Build the APK (in your android_client directory)
-    - name: Build APK
-      run: ./gradlew assembleDebug  # Builds the APK in debug mode
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./android_client/gradlew
 
-    # 5. Upload the APK to GitHub Releases
-    - name: Upload Release APK
-      uses: softprops/action-gh-release@v2
-      with:
-        name: "Android Build"
-        tag_name: "v1.0.${{ github.run_number }}"  # Creates a version tag like 'v1.0.1', 'v1.0.2', etc.
-        files: android_client/app/build/outputs/apk/debug/app-debug.apk   # Path to your APK
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub token to allow uploads to Releases
+      - name: Build APK
+        working-directory: ./android_client
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "AstraClient APK Release"
+          tag_name: "v1.0.${{ github.run_number }}"
+          files: ./android_client/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
