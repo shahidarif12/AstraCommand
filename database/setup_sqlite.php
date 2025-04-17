@@ -6,7 +6,10 @@
 
 // Define the database path
 $dbPath = __DIR__ . '/astra_c2.db';
+$absolutePath = realpath($dbPath) ?: $dbPath;
 echo "Setting up SQLite database at: $dbPath\n";
+echo "Absolute path: $absolutePath\n";
+echo "Current directory: " . getcwd() . "\n";
 
 try {
     // Connect to SQLite database

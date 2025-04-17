@@ -59,30 +59,26 @@ class Database {
                 $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             } else if ($dbType === 'sqlite') {
                 // Create SQLite connection
-                // Try different paths to find the database file
-                $dbPath = getenv('DB_PATH');
-                if (!$dbPath || !file_exists($dbPath)) {
-                    $possiblePaths = [
-                        __DIR__ . '/../../../database/astra_c2.db',  // Three levels up
-                        __DIR__ . '/../../database/astra_c2.db',     // Two levels up
-                        __DIR__ . '/../database/astra_c2.db',        // One level up
-                        dirname(dirname(dirname(__DIR__))) . '/database/astra_c2.db', // Root
-                        getcwd() . '/database/astra_c2.db'           // Current working directory
-                    ];
+                // Always use the absolute path to the database in the root directory
+                $dbPath = '/home/runner/workspace/database/astra_c2.db';
+                error_log("Using fixed SQLite DB Path: " . $dbPath);
+                
+                // Check if the database file exists
+                if (!file_exists($dbPath)) {
+                    error_log("ERROR: SQLite database not found at: " . $dbPath);
+                    error_log("Current working directory: " . getcwd());
                     
-                    foreach ($possiblePaths as $path) {
-                        error_log("Checking SQLite db path: " . $path);
-                        if (file_exists($path)) {
-                            $dbPath = $path;
-                            error_log("Found SQLite database at: " . $dbPath);
-                            break;
+                    // Try to create the database file if it doesn't exist
+                    if (is_dir(dirname($dbPath))) {
+                        $setupScript = dirname($dbPath) . '/setup_sqlite.php';
+                        if (file_exists($setupScript)) {
+                            error_log("Running setup script: " . $setupScript);
+                            include $setupScript;
+                        } else {
+                            error_log("Setup script not found at: " . $setupScript);
                         }
-                    }
-                    
-                    if (!$dbPath || !file_exists($dbPath)) {
-                        // Default to root level database path
-                        $dbPath = getcwd() . '/database/astra_c2.db';
-                        error_log("Using default SQLite DB Path: " . $dbPath);
+                    } else {
+                        error_log("Database directory does not exist: " . dirname($dbPath));
                     }
                 }
                 
