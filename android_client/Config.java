@@ -2,6 +2,8 @@ package com.astra.c2client;
 
 public class Config {
     // Server configuration
+    // IMPORTANT: Change this URL to your actual server domain when deploying
+    // For Hostinger deployment use: https://your-domain.com/c2
     public static final String SERVER_URL = "http://your-domain.com/c2";
     
     // API endpoints
